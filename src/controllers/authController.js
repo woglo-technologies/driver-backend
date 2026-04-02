@@ -1,0 +1,474 @@
+const Driver = require('../models/Driver');
+const Kyc = require('../models/Kyc');
+const Otp = require('../models/Otp');
+const generateToken = require('../utils/generateToken');
+const { sendWhatsAppOtp, sendEmailOtp } = require('../utils/otpService');
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// @desc    Login or Signup with Google
+// @route   POST /api/v1/auth/google
+// @access  Public
+exports.googleLoginOrSignup = async (req, res, next) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      res.status(400);
+      throw new Error('Please provide a Google ID token');
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, picture, sub: googleId } = payload;
+
+    // Find or create driver
+    let driver = await Driver.findOne({ email });
+
+    if (!driver) {
+      // Signup flow
+      driver = await Driver.create({
+        name,
+        email,
+        profilePicture: picture,
+        isVerified: true, // Google accounts are implicitly verified for email
+      });
+    }
+
+    res.status(200).json({
+      _id: driver._id,
+      driverId: driver.driverId,
+      name: driver.name,
+      email: driver.email,
+      phone: driver.phone || null,
+      profilePicture: driver.profilePicture,
+      isVerified: driver.isVerified,
+      token: generateToken(driver._id),
+      needsPhone: !driver.phone // Tell frontend to prompt for phone if missing
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Initiate Email Signup (Sends OTP)
+// @route   POST /api/v1/auth/signup/email
+// @access  Public
+exports.signupEmail = async (req, res, next) => {
+  try {
+    const { name, email, phone, password } = req.body;
+
+    if (!name || !email || !phone || !password) {
+      res.status(400);
+      throw new Error('Please provide name, email, phone, and password');
+    }
+
+    // Check if driver exists with email or phone
+    const driverExists = await Driver.findOne({ $or: [{ email }, { phone }] });
+    if (driverExists) {
+      res.status(400);
+      throw new Error('Driver already exists with that email or phone');
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save OTP to DB (Associate with email)
+    await Otp.findOneAndUpdate(
+      { email },
+      { otp, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+
+    // Send OTP via Email
+    await sendEmailOtp(email, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent to your email. Please verify to complete registration.',
+      // In a real scenario, you might want to temporarily store user data or pass it back to frontend
+      // For simplicity, we'll assume the frontend will send name, phone, password again during verification
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify Email OTP and Complete Signup
+// @route   POST /api/v1/auth/verify-email-otp
+// @access  Public
+exports.verifyEmailOtp = async (req, res, next) => {
+  try {
+    const { name, email, phone, password, otp } = req.body;
+
+    if (!email || !otp || !name || !phone || !password) {
+      res.status(400);
+      throw new Error('Please provide all required fields including the OTP');
+    }
+
+    // Check OTP in DB
+    const otpRecord = await Otp.findOne({ email, otp });
+
+    if (!otpRecord) {
+      res.status(400);
+      throw new Error('Invalid or expired OTP');
+    }
+
+    // OTP is valid, delete it
+    await Otp.deleteOne({ _id: otpRecord._id });
+
+    // Create Driver
+    const driver = await Driver.create({
+      name,
+      email,
+      phone,
+      password,
+    });
+
+    res.status(201).json({
+      _id: driver._id,
+      driverId: driver.driverId,
+      name: driver.name,
+      email: driver.email,
+      phone: driver.phone,
+      token: generateToken(driver._id),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Resend Email OTP
+// @route   POST /api/v1/auth/resend-email-otp
+// @access  Public
+exports.resendEmailOtp = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400);
+      throw new Error('Please provide an email');
+    }
+
+    // Generate new 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save to DB
+    await Otp.findOneAndUpdate(
+      { email },
+      { otp, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+
+    // Send via Email
+    await sendEmailOtp(email, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP resent successfully to your email',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Auth driver & get token
+// @route   POST /api/v1/auth/login/driver
+// @access  Public
+exports.loginDriver = async (req, res, next) => {
+  try {
+    const { email, phone, password } = req.body;
+
+    // Find driver by email or phone
+    const query = email ? { email } : { phone };
+    const driver = await Driver.findOne(query);
+
+    if (driver && (await driver.matchPassword(password))) {
+      res.json({
+        _id: driver._id,
+        driverId: driver.driverId,
+        name: driver.name,
+        email: driver.email,
+        phone: driver.phone,
+        profilePicture: driver.profilePicture,
+        isVerified: driver.isVerified,
+        token: generateToken(driver._id),
+      });
+    } else {
+      res.status(401);
+      throw new Error('Invalid credentials');
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.refreshToken = async (req, res) => { res.json({ message: 'Refresh token endpoint' }); };
+// @desc    Initiate Forgot Password (Sends OTP via Email)
+// @route   POST /api/v1/auth/forgot-password
+// @access  Public
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400);
+      throw new Error('Please provide an email');
+    }
+
+    const driver = await Driver.findOne({ email });
+    if (!driver) {
+      res.status(404);
+      throw new Error('No driver found with that email');
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save/Update OTP in DB
+    await Otp.findOneAndUpdate(
+      { email },
+      { otp, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+
+    // Send OTP via Email
+    await sendEmailOtp(email, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset OTP sent to your email',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset Password using OTP
+// @route   POST /api/v1/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      res.status(400);
+      throw new Error('Please provide email, otp, and newPassword');
+    }
+
+    // Verify OTP
+    const otpRecord = await Otp.findOne({ email, otp });
+
+    if (!otpRecord) {
+      res.status(400);
+      throw new Error('Invalid or expired OTP');
+    }
+
+    // Find Driver
+    const driver = await Driver.findOne({ email });
+    if (!driver) {
+      res.status(404);
+      throw new Error('Driver not found');
+    }
+
+    // Update Password (hashed via pre-save hook in Driver model)
+    driver.password = newPassword;
+    await driver.save();
+
+    // Delete OTP
+    await Otp.deleteOne({ _id: otpRecord._id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful. You can now login with your new password.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Initiate Phone Login/Signup via WhatsApp OTP
+// @route   POST /api/v1/auth/phone-login
+// @access  Public
+exports.loginOrSignupPhone = async (req, res, next) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      res.status(400);
+      throw new Error('Please provide a phone number');
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save to DB (override existing if any)
+    await Otp.findOneAndUpdate(
+      { phone },
+      { otp, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+
+    // Send via WhatsApp
+    await sendWhatsAppOtp(phone, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent successfully to WhatsApp',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify OTP and Login/Signup
+// @route   POST /api/v1/auth/verify-otp
+// @access  Public
+exports.verifyOtp = async (req, res, next) => {
+  try {
+    const { phone, otp } = req.body;
+
+    if (!phone || !otp) {
+      res.status(400);
+      throw new Error('Please provide phone and otp');
+    }
+
+    // Check OTP in DB
+    const otpRecord = await Otp.findOne({ phone, otp });
+
+    if (!otpRecord) {
+      res.status(400);
+      throw new Error('Invalid or expired OTP');
+    }
+
+    // OTP is valid, delete it
+    await Otp.deleteOne({ _id: otpRecord._id });
+
+    // Find or Create Driver
+    let driver = await Driver.findOne({ phone });
+
+    if (!driver) {
+      // Signup Flow (Minimal profile, can be completed later)
+      driver = await Driver.create({
+        phone,
+        name: `User-${phone.slice(-4)}`, // Placeholder name
+        isVerified: true
+      });
+    }
+
+    res.status(200).json({
+      _id: driver._id,
+      driverId: driver.driverId,
+      name: driver.name,
+      phone: driver.phone,
+      isVerified: driver.isVerified,
+      token: generateToken(driver._id),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.verifyEmail = async (req, res) => { res.json({ message: 'Verify email endpoint' }); };
+// @desc    Complete driver registration (Link phone to account via OTP)
+// @route   POST /api/v1/auth/complete-driver-registration
+// @access  Private
+exports.completeDriverRegistration = async (req, res, next) => {
+  try {
+    const { phone, otp } = req.body;
+
+    if (!phone || !otp) {
+      res.status(400);
+      throw new Error('Please provide phone and otp');
+    }
+
+    // Verify OTP first
+    const otpRecord = await Otp.findOne({ phone, otp });
+    if (!otpRecord) {
+      res.status(400);
+      throw new Error('Invalid or expired OTP for this phone');
+    }
+
+    // Check if another driver is already using this phone number
+    const phoneTaken = await Driver.findOne({ phone, _id: { $ne: req.driver._id } });
+    if (phoneTaken) {
+      res.status(400);
+      throw new Error('This phone number is already linked to another account');
+    }
+
+    // Link phone and update driver profile
+    const driver = await Driver.findById(req.driver._id);
+    if (!driver) {
+      res.status(404);
+      throw new Error('Driver not found');
+    }
+
+    driver.phone = phone;
+    driver.isVerified = true;
+    const updatedDriver = await driver.save();
+
+    // Delete OTP record after successful linking
+    await Otp.deleteOne({ _id: otpRecord._id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Phone number linked successfully',
+      data: {
+        _id: updatedDriver._id,
+        driverId: updatedDriver.driverId,
+        name: updatedDriver.name,
+        email: updatedDriver.email,
+        phone: updatedDriver.phone,
+        isVerified: updatedDriver.isVerified,
+        token: generateToken(updatedDriver._id),
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Upload KYC document
+// @route   POST /api/v1/auth/upload-driver-kyc
+// @access  Private
+exports.uploadDriverKyc = async (req, res, next) => {
+  try {
+    const { type } = req.body;
+
+    if (!req.file) {
+      res.status(400);
+      throw new Error('Please upload a file');
+    }
+
+    if (!type) {
+      res.status(400);
+      throw new Error('Please provide the KYC document type');
+    }
+
+    // Map to valid KYC types defined in model
+    const validTypes = ['Driving License', 'Aadhar Card', 'PAN Card', 'Passport'];
+    if (!validTypes.includes(type)) {
+      res.status(400);
+      throw new Error(`Invalid KYC type. Must be one of: ${validTypes.join(', ')}`);
+    }
+
+    const kyc = await Kyc.create({
+      driver: req.driver._id,
+      type,
+      fileUrl: `/uploads/kyc/${req.file.filename}`,
+      status: 'pending',
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'KYC Document uploaded successfully',
+      data: kyc,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
