@@ -14,6 +14,7 @@ const sendWhatsAppOtp = async (phone, otp) => {
     integrated_number: senderNumber,
     content_type: 'template',
     payload: {
+      to: phone,
       messaging_product: 'whatsapp',
       type: 'template',
       template: {
@@ -36,8 +37,7 @@ const sendWhatsAppOtp = async (phone, otp) => {
           }
         ]
       }
-    },
-    to: phone
+    }
   });
 
   const config = {
