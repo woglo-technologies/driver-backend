@@ -2,7 +2,7 @@ const Driver = require('../models/Driver');
 const Kyc = require('../models/Kyc');
 const Otp = require('../models/Otp');
 const generateToken = require('../utils/generateToken');
-const { sendWhatsAppOtp, sendEmailOtp } = require('../utils/otpService');
+const { sendOtpViaMsg91, sendSignupEmailViaMsg91 } = require('../utils/otpService');
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -85,7 +85,7 @@ exports.signupEmail = async (req, res, next) => {
     );
 
     // Send OTP via Email
-    await sendEmailOtp(email, otp);
+    await sendSignupEmailViaMsg91(email, otp);
 
     res.status(200).json({
       success: true,
@@ -165,7 +165,7 @@ exports.resendEmailOtp = async (req, res, next) => {
     );
 
     // Send via Email
-    await sendEmailOtp(email, otp);
+    await sendSignupEmailViaMsg91(email, otp);
 
     res.status(200).json({
       success: true,
@@ -237,7 +237,7 @@ exports.forgotPassword = async (req, res, next) => {
     );
 
     // Send OTP via Email
-    await sendEmailOtp(email, otp);
+    await sendSignupEmailViaMsg91(email, otp);
 
     res.status(200).json({
       success: true,
@@ -314,7 +314,7 @@ exports.loginOrSignupPhone = async (req, res, next) => {
     );
 
     // Send via WhatsApp
-    await sendWhatsAppOtp(phone, otp);
+    await sendOtpViaMsg91(phone, otp);
 
     res.status(200).json({
       success: true,
