@@ -9,6 +9,7 @@ const sendWhatsAppOtp = async (phone, otp) => {
   const authKey = process.env.MSG91_EMAIL_AUTHKEY;
   const templateName = process.env.MSG91_WHATSAPP_TEMPLATE_NAME;
   const senderNumber = process.env.MSG91_WHATSAPP_NUMBER;
+  const languageCode = process.env.MSG91_WHATSAPP_LANGUAGE || 'en';
 
   const data = JSON.stringify({
     integrated_number: senderNumber,
@@ -19,7 +20,7 @@ const sendWhatsAppOtp = async (phone, otp) => {
       type: 'template',
       template: {
         name: templateName,
-        language: { code: 'en' },
+        language: { code: languageCode },
         components: [
           {
             type: 'body',

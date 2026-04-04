@@ -81,7 +81,7 @@ exports.signupEmail = async (req, res, next) => {
     await Otp.findOneAndUpdate(
       { email },
       { otp, createdAt: new Date() },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     // Send OTP via Email
@@ -161,7 +161,7 @@ exports.resendEmailOtp = async (req, res, next) => {
     await Otp.findOneAndUpdate(
       { email },
       { otp, createdAt: new Date() },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     // Send via Email
@@ -233,7 +233,7 @@ exports.forgotPassword = async (req, res, next) => {
     await Otp.findOneAndUpdate(
       { email },
       { otp, createdAt: new Date() },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     // Send OTP via Email
@@ -310,7 +310,7 @@ exports.loginOrSignupPhone = async (req, res, next) => {
     await Otp.findOneAndUpdate(
       { phone },
       { otp, createdAt: new Date() },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     // Send via WhatsApp
