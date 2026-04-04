@@ -62,16 +62,25 @@ exports.signupEmail = async (req, res, next) => {
   try {
     const { name, email, phone, password } = req.body;
 
-    if (!name || !email || !phone || !password) {
+    if (!name || !email || !password) {
       res.status(400);
-      throw new Error('Please provide name, email, phone, and password');
+      throw new Error('Please provide name, email, and password');
     }
 
-    // Check if driver exists with email or phone
-    const driverExists = await Driver.findOne({ $or: [{ email }, { phone }] });
+    // Check if driver exists with email
+    const driverExists = await Driver.findOne({ email });
     if (driverExists) {
       res.status(400);
-      throw new Error('Driver already exists with that email or phone');
+      throw new Error('Driver already exists with that email');
+    }
+
+    // If phone provided, check it's not already taken
+    if (phone) {
+      const phoneTaken = await Driver.findOne({ phone });
+      if (phoneTaken) {
+        res.status(400);
+        throw new Error('Driver already exists with that phone number');
+      }
     }
 
     // Generate 6-digit OTP
@@ -105,9 +114,9 @@ exports.verifyEmailOtp = async (req, res, next) => {
   try {
     const { name, email, phone, password, otp } = req.body;
 
-    if (!email || !otp || !name || !phone || !password) {
+    if (!email || !otp || !name || !password) {
       res.status(400);
-      throw new Error('Please provide all required fields including the OTP');
+      throw new Error('Please provide name, email, password, and the OTP');
     }
 
     // Check OTP in DB
@@ -121,12 +130,12 @@ exports.verifyEmailOtp = async (req, res, next) => {
     // OTP is valid, delete it
     await Otp.deleteOne({ _id: otpRecord._id });
 
-    // Create Driver
+    // Create Driver (phone is optional, can be linked later)
     const driver = await Driver.create({
       name,
       email,
-      phone,
       password,
+      ...(phone ? { phone } : {}),
     });
 
     res.status(201).json({
