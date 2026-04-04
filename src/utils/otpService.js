@@ -18,43 +18,32 @@ async function sendOtpViaMsg91(phone, otp) {
     integrated_number: process.env.MSG91_WHATSAPP_NUMBER,
     content_type: "template",
     payload: {
+      messaging_product: "whatsapp",
+      to: cleanPhone,
       type: "template",
       template: {
         name: process.env.MSG91_WHATSAPP_TEMPLATE_NAME,
         language: {
-          code: process.env.MSG91_WHATSAPP_LANGUAGE || "en_US",
-          policy: "deterministic"
+          code: process.env.MSG91_WHATSAPP_LANGUAGE || "en_US"
         },
-        to_and_components: [
+        components: [
           {
-            to: [cleanPhone],
-            components: {
-              body_1: {
-                type: "text",
-                value: process.env.MSG91_PARAM_1 || "accessing"
-              },
-              body_2: {
-                type: "text",
-                value: process.env.MSG91_PARAM_2 || "Woglo"
-              },
-              body_3: {
-                type: "text",
-                value: process.env.MSG91_PARAM_3 || "your device"
-              },
-              body_4: {
-                type: "text",
-                value: otp
-              },
-              body_5: {
-                type: "text",
-                value: process.env.MSG91_PARAM_5 || "Woglo Support"
-              },
-              button_1: {
-                type: "text",
-                sub_type: "url",
-                value: otp
-              }
-            }
+            type: "body",
+            parameters: [
+              { type: "text", text: process.env.MSG91_PARAM_1 || "accessing" },
+              { type: "text", text: process.env.MSG91_PARAM_2 || "Woglo" },
+              { type: "text", text: process.env.MSG91_PARAM_3 || "your device" },
+              { type: "text", text: otp },
+              { type: "text", text: process.env.MSG91_PARAM_5 || "Woglo Support" }
+            ]
+          },
+          {
+            type: "button",
+            sub_type: "url",
+            index: "0",
+            parameters: [
+              { type: "text", text: otp }
+            ]
           }
         ]
       }
