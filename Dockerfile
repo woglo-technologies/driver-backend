@@ -19,4 +19,4 @@ COPY . .
 ENV NODE_ENV=production
 
 # Run the web service on container startup.
-CMD [ "npm", "start" ]
+CMD [ "node", "server.js" ]

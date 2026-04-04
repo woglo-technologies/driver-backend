@@ -464,6 +464,18 @@ exports.markAllNotificationsRead = async (req, res, next) => {
 // @desc    Get past completed/cancelled rides
 // @route   GET /api/v1/driver/past-rides
 // @access  Private
+exports.getPastRides = async (req, res, next) => {
+  try {
+    const rides = await Ride.find({ 
+      driver: req.driver._id, 
+      status: { $in: ['completed', 'cancelled', 'rejected'] } 
+    }).sort({ createdAt: -1 });
+    res.json(rides);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Update ride status (accept/reject)
 // @route   PUT /api/v1/driver/requests/:id/status
 // @access  Private

@@ -1,49 +1,69 @@
-require('dotenv').config();
-const app = require('./src/app');
+const express = require('express');
 const mongoose = require('mongoose');
+const http = require('http');
 
-const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI;
+// Immediate Port Binding Strategy
+const PORT = process.env.PORT || 8080;
+const app = express();
+const server = http.createServer(app);
 
-// Validate environment variables
-if (!MONGO_URI) {
-  console.error('FATAL ERROR: MONGO_URI is not defined in environment variables.');
-  process.exit(1);
-}
+// Simple health check for Cloud Run BEFORE anything else loads
+app.get('/_health', (req, res) => res.status(200).send('OK'));
 
-// Redact password for logging
-const redactedURI = MONGO_URI.replace(/:([^@]+)@/, ':****@');
-
-// Start the server immediately
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[STARTUP] Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-  console.log(`[STARTUP] Attempting to connect to MongoDB: ${redactedURI}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`[BOOT] 🚀 Early server listener active on port ${PORT}`);
 });
 
-// Database connection attempt (non-blocking for server startup)
-mongoose.connect(MONGO_URI)
-  .then(() => {
-    console.log('[DATABASE] Connected to MongoDB successfully.');
-  })
-  .catch((error) => {
-    console.error('[DATABASE] MongoDB connection error:', error.message);
-    console.error('[DATABASE] Tip: Ensure the IP address is allowlisted in MongoDB Atlas (0.0.0.0/0 for Cloud Run).');
-    // We don't exit here so the process stays alive and Cloud Run health check passes,
-    // but the app might fail on DB-reliant requests until connection is established.
-  });
+// Global Error Catching
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL ERROR] Uncaught Exception:', err.message);
+  console.error(err.stack);
+  // Keep process alive for a bit so logs flush
+  setTimeout(() => process.exit(1), 1000);
+});
 
-// Handle graceful shutdown for Cloud Run
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  const s = await server;
-  if (s) {
-    s.close(async () => {
-      console.log('HTTP server closed');
-      await mongoose.connection.close();
-      console.log('MongoDB connection closed');
-      process.exit(0);
-    });
-  } else {
-    process.exit(0);
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL ERROR] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Deferred module loading
+async function startApp() {
+  try {
+    console.log('[BOOT] 📦 Loading application modules...');
+    require('dotenv').config();
+    const mainApp = require('./src/app');
+    const MONGO_URI = process.env.MONGO_URI;
+
+    if (!MONGO_URI) {
+      throw new Error('MONGO_URI is missing from environment variables');
+    }
+
+    // Mount the real app onto our listening server
+    app.use(mainApp);
+    console.log('[BOOT] ✅ Application modules mounted');
+
+    // Redact password for logging
+    const redactedURI = MONGO_URI.replace(/:([^@]+)@/, ':****@');
+    console.log(`[DATABASE] 📡 Attempting connection to: ${redactedURI}`);
+
+    await mongoose.connect(MONGO_URI);
+    console.log('[DATABASE] 🟢 Connected to MongoDB successfully');
+
+  } catch (error) {
+    console.error('[FATAL BOOT ERROR] Failed to initialize application:');
+    console.error(error.message);
+    console.error(error.stack);
+    // We DON'T exit here so the port remains bound and you can see this error in the console.
   }
+}
+
+startApp();
+
+// Handle graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received: closing server');
+  server.close(async () => {
+    await mongoose.connection.close();
+    process.exit(0);
+  });
 });
