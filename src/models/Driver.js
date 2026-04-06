@@ -14,7 +14,7 @@ const driverSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Pre-save hook to hash password and generate driverId if new
-driverSchema.pre('save', async function(next) {
+driverSchema.pre('save', async function() {
   // Generate Custom User ID if it doesn't exist
   if (!this.driverId) {
     const randomNum = Math.floor(10000 + Math.random() * 90000); // 5 digit random number
@@ -23,12 +23,11 @@ driverSchema.pre('save', async function(next) {
 
   // Hash password only if modified
   if (!this.isModified('password')) {
-    return next();
+    return;
   }
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 // Method to verify password match

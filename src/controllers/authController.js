@@ -60,7 +60,7 @@ exports.googleLoginOrSignup = async (req, res, next) => {
 // @access  Public
 exports.signupEmail = async (req, res, next) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
       res.status(400);
@@ -72,15 +72,6 @@ exports.signupEmail = async (req, res, next) => {
     if (driverExists) {
       res.status(400);
       throw new Error('Driver already exists with that email');
-    }
-
-    // If phone provided, check it's not already taken
-    if (phone) {
-      const phoneTaken = await Driver.findOne({ phone });
-      if (phoneTaken) {
-        res.status(400);
-        throw new Error('Driver already exists with that phone number');
-      }
     }
 
     // Generate 6-digit OTP
@@ -112,11 +103,11 @@ exports.signupEmail = async (req, res, next) => {
 // @access  Public
 exports.verifyEmailOtp = async (req, res, next) => {
   try {
-    const { name, email, phone, password, otp } = req.body;
+    const { name, email, password, otp } = req.body;
 
     if (!email || !otp || !name || !password) {
       res.status(400);
-      throw new Error('Please provide name, email, password, and the OTP');
+      throw new Error('Please provide all required fields including the OTP');
     }
 
     // Check OTP in DB
@@ -130,12 +121,11 @@ exports.verifyEmailOtp = async (req, res, next) => {
     // OTP is valid, delete it
     await Otp.deleteOne({ _id: otpRecord._id });
 
-    // Create Driver (phone is optional, can be linked later)
+    // Create Driver
     const driver = await Driver.create({
       name,
       email,
       password,
-      ...(phone ? { phone } : {}),
     });
 
     res.status(201).json({
