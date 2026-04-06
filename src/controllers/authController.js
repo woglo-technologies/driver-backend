@@ -2,7 +2,7 @@ const Driver = require('../models/Driver');
 const Kyc = require('../models/Kyc');
 const Otp = require('../models/Otp');
 const generateToken = require('../utils/generateToken');
-const { sendOtpViaMsg91, sendSignupEmailViaMsg91 } = require('../utils/otpService');
+const { sendOtpViaMsg91, sendSignupEmailViaMsg91, sendForgotPasswordEmailViaMsg91 } = require('../utils/otpService');
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -236,7 +236,7 @@ exports.forgotPassword = async (req, res, next) => {
     );
 
     // Send OTP via Email
-    await sendSignupEmailViaMsg91(email, otp);
+    await sendForgotPasswordEmailViaMsg91(email, otp);
 
     res.status(200).json({
       success: true,

@@ -105,6 +105,44 @@ async function sendResetEmailViaMsg91(email, token) {
   }
 }
 
+async function sendForgotPasswordEmailViaMsg91(email, otp) {
+  const payload = {
+    recipients: [
+      {
+        to: [{ email }],
+        variables: {
+          otp: otp,
+          email: email,
+        },
+      },
+    ],
+    from: {
+      email: process.env.MSG91_EMAIL_FROM,
+      name: process.env.MSG91_EMAIL_FROM_NAME || "Woglo",
+    },
+    domain: process.env.MSG91_EMAIL_DOMAIN,
+    template_id: process.env.MSG91_EMAIL_TEMPLATE_ID, // reset_password_65
+  };
+
+  try {
+    const response = await axios.post(
+      "https://api.msg91.com/api/v5/email/send",
+      payload,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          authkey: process.env.MSG91_EMAIL_AUTHKEY,
+        },
+      }
+    );
+    console.log("MSG91 Forgot Password Email Success:", response.data);
+    return response.data;
+  } catch (err) {
+    console.error("MSG91 Forgot Password Email Error:", err.response?.data || err.message);
+    throw new Error("Failed to send forgot password email");
+  }
+}
+
 async function sendSignupEmailViaMsg91(email, otp) {
   const payload = {
     recipients: [
@@ -146,5 +184,6 @@ async function sendSignupEmailViaMsg91(email, otp) {
 module.exports = {
   sendResetEmailViaMsg91,
   sendSignupEmailViaMsg91,
+  sendForgotPasswordEmailViaMsg91,
   sendOtpViaMsg91,
 };
