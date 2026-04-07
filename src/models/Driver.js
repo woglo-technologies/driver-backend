@@ -7,6 +7,28 @@ const driverSchema = new mongoose.Schema({
   email: { type: String, unique: true, sparse: true },
   phone: { type: String, unique: true, sparse: true },
   password: { type: String },
+  dob: { type: Date },
+  address: {
+    line1: { type: String },
+    city: { type: String },
+    state: { type: String },
+    country: { type: String },
+    pinCode: { type: String }
+  },
+  license: {
+    number: { type: String },
+    validTill: { type: String },
+    types: [{ type: String }]
+  },
+  documents: {
+    aadharNumber: { type: String },
+    panCardNumber: { type: String }
+  },
+  bankDetails: {
+    bankName: { type: String },
+    accountNumber: { type: String },
+    ifscCode: { type: String }
+  },
   profilePicture: { type: String },
   rating: { type: Number, default: 0 },
   isVerified: { type: Boolean, default: false },

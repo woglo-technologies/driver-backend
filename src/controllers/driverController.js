@@ -46,6 +46,38 @@ exports.updateAccountProfile = async (req, res, next) => {
         driver.password = req.body.password;
       }
 
+      // Update all new profile fields
+      if (req.body.dob) driver.dob = req.body.dob;
+      if (req.body.address) {
+        driver.address = {
+          line1: req.body.address.line1 || driver.address?.line1,
+          city: req.body.address.city || driver.address?.city,
+          state: req.body.address.state || driver.address?.state,
+          country: req.body.address.country || driver.address?.country,
+          pinCode: req.body.address.pinCode || driver.address?.pinCode
+        };
+      }
+      if (req.body.license) {
+        driver.license = {
+          number: req.body.license.number || driver.license?.number,
+          validTill: req.body.license.validTill || driver.license?.validTill,
+          types: req.body.license.types || driver.license?.types
+        };
+      }
+      if (req.body.documents) {
+        driver.documents = {
+          aadharNumber: req.body.documents.aadharNumber || driver.documents?.aadharNumber,
+          panCardNumber: req.body.documents.panCardNumber || driver.documents?.panCardNumber
+        };
+      }
+      if (req.body.bankDetails) {
+        driver.bankDetails = {
+          bankName: req.body.bankDetails.bankName || driver.bankDetails?.bankName,
+          accountNumber: req.body.bankDetails.accountNumber || driver.bankDetails?.accountNumber,
+          ifscCode: req.body.bankDetails.ifscCode || driver.bankDetails?.ifscCode
+        };
+      }
+
       const updatedDriver = await driver.save();
 
       res.json({
@@ -54,7 +86,12 @@ exports.updateAccountProfile = async (req, res, next) => {
         name: updatedDriver.name,
         email: updatedDriver.email,
         phone: updatedDriver.phone,
-        isVerified: updatedDriver.isVerified
+        isVerified: updatedDriver.isVerified,
+        dob: updatedDriver.dob,
+        address: updatedDriver.address,
+        license: updatedDriver.license,
+        documents: updatedDriver.documents,
+        bankDetails: updatedDriver.bankDetails
       });
     } else {
       res.status(404);
