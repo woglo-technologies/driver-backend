@@ -180,10 +180,24 @@ exports.resendEmailOtp = async (req, res, next) => {
 // @access  Public
 exports.loginDriver = async (req, res, next) => {
   try {
-    const { email, phone, password } = req.body;
+    const { identifier, email, phone, password } = req.body;
 
-    // Find driver by email or phone
-    const query = email ? { email } : { phone };
+    // Accept 'identifier' (sent by Flutter app) OR explicit 'email'/'phone'
+    const loginId = identifier || email || phone;
+
+    if (!loginId || !password) {
+      res.status(400);
+      throw new Error('Please provide your email/phone and password');
+    }
+
+    // Auto-detect: if it contains @ it's an email, otherwise treat as phone
+    let query;
+    if (loginId.includes('@')) {
+      query = { email: loginId.toLowerCase().trim() };
+    } else {
+      query = { phone: Driver.normalizePhone(loginId) };
+    }
+
     const driver = await Driver.findOne(query);
 
     if (driver && (await driver.matchPassword(password))) {
