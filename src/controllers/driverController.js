@@ -33,13 +33,14 @@ exports.updateAccountProfile = async (req, res, next) => {
 
     if (driver) {
       driver.name = req.body.name || driver.name;
-      if (req.body.phone && req.body.phone !== driver.phone) {
-        const phoneExists = await Driver.findOne({ phone: req.body.phone, _id: { $ne: driver._id } });
+      if (req.body.phone && Driver.normalizePhone(req.body.phone) !== driver.phone) {
+        const normalizedPhone = Driver.normalizePhone(req.body.phone);
+        const phoneExists = await Driver.findOne({ phone: normalizedPhone, _id: { $ne: driver._id } });
         if (phoneExists) {
           res.status(400);
           throw new Error('This phone number is already in use by another account');
         }
-        driver.phone = req.body.phone;
+        driver.phone = normalizedPhone;
       }
 
       if (req.body.password) {

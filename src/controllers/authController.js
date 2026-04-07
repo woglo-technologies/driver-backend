@@ -295,7 +295,8 @@ exports.resetPassword = async (req, res, next) => {
 // @access  Public
 exports.loginOrSignupPhone = async (req, res, next) => {
   try {
-    const { phone } = req.body;
+    const { phone: rawPhone } = req.body;
+    const phone = Driver.normalizePhone(rawPhone);
 
     if (!phone) {
       res.status(400);
@@ -329,7 +330,8 @@ exports.loginOrSignupPhone = async (req, res, next) => {
 // @access  Public
 exports.verifyOtp = async (req, res, next) => {
   try {
-    const { phone, otp } = req.body;
+    const { phone: rawPhone, otp } = req.body;
+    const phone = Driver.normalizePhone(rawPhone);
 
     if (!phone || !otp) {
       res.status(400);
@@ -378,7 +380,8 @@ exports.verifyEmail = async (req, res) => { res.json({ message: 'Verify email en
 // @access  Private
 exports.completeDriverRegistration = async (req, res, next) => {
   try {
-    const { phone, otp } = req.body;
+    const { phone: rawPhone, otp } = req.body;
+    const phone = Driver.normalizePhone(rawPhone);
 
     if (!phone || !otp) {
       res.status(400);

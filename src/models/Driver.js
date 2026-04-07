@@ -35,8 +35,23 @@ const driverSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
+// Helper to normalize phone numbers to 91xxxxxxxxxx format
+driverSchema.statics.normalizePhone = function(phone) {
+  if (!phone) return null;
+  let cleanPhone = String(phone).replace(/\D/g, "");
+  if (cleanPhone.length === 10) {
+    cleanPhone = "91" + cleanPhone;
+  }
+  return cleanPhone;
+};
+
 // Pre-save hook to hash password and generate driverId if new
 driverSchema.pre('save', async function() {
+  // Normalize phone if modified
+  if (this.isModified('phone') && this.phone) {
+    this.phone = mongoose.model('Driver').normalizePhone(this.phone);
+  }
+
   // Generate Custom User ID if it doesn't exist
   if (!this.driverId) {
     const randomNum = Math.floor(10000 + Math.random() * 90000); // 5 digit random number
