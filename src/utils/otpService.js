@@ -127,7 +127,12 @@ async function sendForgotPasswordEmailViaMsg91(email, otp, appType) {
   const payload = {
     recipients: [
       {
-        to: [{ email }],
+        to: [
+          {
+            email: email,
+            name: email.split("@")[0], // Fallback name
+          },
+        ],
         variables: variables,
       },
     ],
@@ -153,8 +158,9 @@ async function sendForgotPasswordEmailViaMsg91(email, otp, appType) {
     console.log("MSG91 Forgot Password Email Success:", response.data);
     return response.data;
   } catch (err) {
-    console.error("MSG91 Forgot Password Email Error:", err.response?.data || err.message);
-    throw new Error("Failed to send forgot password email");
+    const msg91Error = err.response?.data || err.message;
+    console.error("MSG91 Forgot Password Email Error:", msg91Error);
+    throw new Error(`Failed to send forgot password email: ${JSON.stringify(msg91Error)}`);
   }
 }
 
@@ -162,7 +168,12 @@ async function sendSignupEmailViaMsg91(email, otp) {
   const payload = {
     recipients: [
       {
-        to: [{ email }],
+        to: [
+          {
+            email: email,
+            name: email.split("@")[0],
+          },
+        ],
         variables: {
           otp: otp,
           email: email,
@@ -191,8 +202,9 @@ async function sendSignupEmailViaMsg91(email, otp) {
     console.log("MSG91 Signup Email Success:", response.data);
     return response.data;
   } catch (err) {
-    console.error("MSG91 Signup Email Error:", err.response?.data || err.message);
-    throw new Error("Failed to send signup email");
+    const msg91Error = err.response?.data || err.message;
+    console.error("MSG91 Signup Email Error:", msg91Error);
+    throw new Error(`Failed to send signup email: ${JSON.stringify(msg91Error)}`);
   }
 }
 
