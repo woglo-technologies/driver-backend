@@ -151,7 +151,24 @@ exports.getAccountProfile = async (req, res) => { res.json({ message: 'Get drive
 exports.getVendorRequests = async (req, res, next) => {
   try {
     const requests = await VendorRequest.find({ driver: req.driver._id }).sort({ createdAt: -1 });
-    res.json(requests);
+    
+    // Map to frontend VendorRequest model format
+    const mappedRequests = requests.map(r => ({
+      id: r._id,
+      vendorName: r.vendorName,
+      agencyName: r.agencyName,
+      workLocation: r.workLocation,
+      description: r.description,
+      requestDate: r.createdAt.toISOString(),
+      status: r.status,
+      contactNumber: r.vehicleDetails?.contactNumber, // If available
+      email: r.vehicleDetails?.email, // If available
+      vehicleType: r.vehicleDetails?.make,
+      vehicleModel: r.vehicleDetails?.model,
+      vehicleNumber: r.vehicleDetails?.licensePlate
+    }));
+
+    res.json(mappedRequests);
   } catch (error) {
     next(error);
   }
@@ -194,11 +211,21 @@ exports.respondToVendorRequest = async (req, res, next) => {
         year: vDetails.year,
         licensePlate: vDetails.licensePlate,
         color: vDetails.color,
-        isApproved: true // Implicit trust since vendor provided it
+        isApproved: true, // Implicit trust since vendor provided it
+        vendorName: request.vendorName,
+        agencyName: request.agencyName,
+        workLocation: request.workLocation,
+        description: request.description,
+        partnershipDate: new Date()
       });
     }
 
-    res.json(updatedRequest);
+    res.json({
+      id: updatedRequest._id,
+      status: updatedRequest.status,
+      vendorName: updatedRequest.vendorName,
+      requestDate: updatedRequest.createdAt.toISOString()
+    });
   } catch (error) {
     next(error);
   }
@@ -211,17 +238,17 @@ exports.mockCreateVendorRequest = async (req, res, next) => {
   try {
     const mockRequest = await VendorRequest.create({
       vendorId: `VND-${Math.floor(1000 + Math.random() * 9000)}`,
-      vendorName: req.body.vendorName || "Mock Travel Agency",
-      agencyName: req.body.agencyName || "Mock Travel Co.",
-      workLocation: req.body.workLocation || "Delhi NCR",
-      description: req.body.description || "Looking for a reliable driver.",
+      vendorName: req.body.vendorName || "Global Travels",
+      agencyName: req.body.agencyName || "Premium Tourism Services",
+      workLocation: req.body.workLocation || "Delhi, NCR",
+      description: req.body.description || "Partnered for long-term airport transfer services.",
       driver: req.driver._id,
       vehicleDetails: {
         make: req.body.vehicleMake || "Toyota",
         model: req.body.vehicleModel || "Innova Crysta",
-        year: req.body.vehicleYear || 2022,
-        licensePlate: req.body.licensePlate || `DL-${Math.floor(1000 + Math.random() * 9000)}`,
-        color: req.body.vehicleColor || "White"
+        year: req.body.vehicleYear || 2023,
+        licensePlate: req.body.licensePlate || `DL-01-AB-${Math.floor(1000 + Math.random() * 9000)}`,
+        color: req.body.vehicleColor || "Metallic White"
       }
     });
     res.status(201).json(mockRequest);
@@ -235,9 +262,26 @@ exports.mockCreateVendorRequest = async (req, res, next) => {
 // @access  Private
 exports.getMyVehicles = async (req, res, next) => {
   try {
-    // Note: Vehicles are populated based on accepted vendor requests in another flow
     const vehicles = await Vehicle.find({ driver: req.driver._id });
-    res.json(vehicles);
+    
+    // Map to frontend DriverVehicle model format
+    const mappedVehicles = vehicles.map(v => ({
+      id: v._id,
+      vehicleNumber: v.licensePlate,
+      vehicleType: v.make, // Assuming make/model or type needs mapping
+      vehicleModel: v.model,
+      vehicleBrand: v.make,
+      color: v.color || '',
+      yearOfManufacture: v.year || 0,
+      status: v.isApproved ? 'ACTIVE' : 'PENDING_APPROVAL',
+      vendorName: v.vendorName,
+      agencyName: v.agencyName,
+      workLocation: v.workLocation,
+      description: v.description,
+      partnershipDate: v.partnershipDate ? v.partnershipDate.toISOString() : v.createdAt.toISOString()
+    }));
+
+    res.json(mappedVehicles);
   } catch (error) {
     next(error);
   }
@@ -395,7 +439,19 @@ exports.getCurrentCalendar = async (req, res, next) => {
 exports.getCalendar = async (req, res, next) => {
   try {
     const events = await Event.find({ driver: req.driver._id }).sort({ date: 1 });
-    res.json(events);
+    
+    // Map to frontend CalendarEvent format
+    const mappedEvents = events.map(e => ({
+      id: e._id,
+      type: e.type,
+      date: e.date.toISOString(),
+      description: e.description || '',
+      tripId: e.tripId,
+      status: 'confirmed', // Events in DB are considered confirmed
+      createdAt: e.createdAt.toISOString()
+    }));
+
+    res.json(mappedEvents);
   } catch (error) {
     next(error);
   }
@@ -408,7 +464,18 @@ exports.getCalendarAvailability = async (req, res, next) => {
   try {
     // Return days specifically marked, the frontend will assume all other non-marked days are available
     const events = await Event.find({ driver: req.driver._id });
-    res.json(events);
+    
+    const mappedEvents = events.map(e => ({
+      id: e._id,
+      type: e.type,
+      date: e.date.toISOString(),
+      description: e.description || '',
+      tripId: e.tripId,
+      status: 'confirmed',
+      createdAt: e.createdAt.toISOString()
+    }));
+
+    res.json(mappedEvents);
   } catch (error) {
     next(error);
   }
@@ -457,7 +524,14 @@ exports.updateCalendarStatus = async (req, res, next) => {
       });
     }
 
-    res.json(event);
+    res.json({
+      id: event._id,
+      type: event.type,
+      date: event.date.toISOString(),
+      description: event.description || '',
+      status: 'confirmed',
+      createdAt: event.createdAt.toISOString()
+    });
   } catch (error) {
     next(error);
   }
@@ -469,7 +543,18 @@ exports.updateCalendarStatus = async (req, res, next) => {
 exports.getNotifications = async (req, res, next) => {
   try {
     const notifications = await Notification.find({ driver: req.driver._id }).sort({ createdAt: -1 });
-    res.json(notifications);
+    
+    // Map to frontend Notification model format
+    const mappedNotifications = notifications.map(n => ({
+      id: n._id,
+      title: n.title,
+      message: n.message,
+      isRead: n.isRead,
+      type: n.type || 'GENERAL',
+      createdAt: n.createdAt.toISOString()
+    }));
+
+    res.json(mappedNotifications);
   } catch (error) {
     next(error);
   }
@@ -568,6 +653,67 @@ exports.updateRideStatus = async (req, res, next) => {
     }
 
     res.json(updatedRide);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Upload profile picture
+// @route   POST /api/v1/driver/profile-picture
+// @access  Private
+exports.uploadProfilePicture = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      res.status(400);
+      throw new Error('Please upload an image');
+    }
+
+    const driver = await Driver.findById(req.driver._id);
+    if (!driver) {
+      res.status(404);
+      throw new Error('Driver not found');
+    }
+
+    // Save relative path (e.g., uploads/profiles/filename.png)
+    driver.profilePicture = `/${req.file.path.replace(/\\/g, '/')}`;
+    await driver.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture updated successfully',
+      profilePicture: driver.profilePicture,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete driver account and all associated data
+// @route   DELETE /api/v1/driver/account
+// @access  Private
+exports.deleteAccount = async (req, res, next) => {
+  try {
+    const driverId = req.driver._id;
+
+    // Delete associated data first
+    await Vehicle.deleteMany({ owner: driverId });
+    await Ride.deleteMany({ driver: driverId });
+    await Event.deleteMany({ driver: driverId });
+    await Notification.deleteMany({ recipient: driverId });
+    await Message.deleteMany({ $or: [{ senderId: driverId }, { receiverId: driverId }] });
+    
+    // Finally delete the driver
+    const driver = await Driver.findByIdAndDelete(driverId);
+
+    if (!driver) {
+      res.status(404);
+      throw new Error('Driver not found');
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Account and all associated data deleted successfully',
+    });
   } catch (error) {
     next(error);
   }

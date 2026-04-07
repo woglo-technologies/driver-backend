@@ -13,6 +13,7 @@ router.post('/profile-picture', uploadProfile.single('profileImage'), driverCont
 router.route('/account/profile')
   .get(driverController.getProfile)
   .put(driverController.updateAccountProfile);
+router.delete('/account', driverController.deleteAccount);
 router.get('/my-vehicles', driverController.getMyVehicles);
 
 router.get('/requests', driverController.getRequests);

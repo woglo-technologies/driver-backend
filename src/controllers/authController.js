@@ -474,3 +474,44 @@ exports.uploadDriverKyc = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Change password
+ * @route   PUT /api/v1/auth/change-password
+ * @access  Private
+ */
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      res.status(400);
+      throw new Error('Please provide current and new passwords');
+    }
+
+    const driver = await Driver.findById(req.driver._id);
+
+    if (!driver) {
+      res.status(404);
+      throw new Error('Driver not found');
+    }
+
+    // Verify current password
+    const isMatch = await driver.matchPassword(currentPassword);
+    if (!isMatch) {
+      res.status(401);
+      throw new Error('Invalid current password');
+    }
+
+    // Update password (pre-save hook will hash it)
+    driver.password = newPassword;
+    await driver.save();
+
+    res.json({
+      success: true,
+      message: 'Password updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
