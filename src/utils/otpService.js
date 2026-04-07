@@ -105,15 +105,30 @@ async function sendResetEmailViaMsg91(email, token) {
   }
 }
 
-async function sendForgotPasswordEmailViaMsg91(email, otp) {
+async function sendForgotPasswordEmailViaMsg91(email, otp, appType) {
+  // Default to the general template (Vendor App)
+  let templateId = process.env.MSG91_EMAIL_TEMPLATE_ID;
+  
+  // Use the Driver-specific template if provided
+  if (appType === 'driver' && process.env.MSG91_DRIVER_FORGOT_PASSWORD_TEMPLATE_ID) {
+    templateId = process.env.MSG91_DRIVER_FORGOT_PASSWORD_TEMPLATE_ID;
+  }
+
+  // Construct the reset link (only for Vendor App)
+  let variables = {
+    otp: otp,
+    email: email,
+  };
+
+  if (appType !== 'driver' && process.env.FRONTEND_RESET_URL) {
+    variables.reset_link = `${process.env.FRONTEND_RESET_URL}?otp=${encodeURIComponent(otp)}&email=${encodeURIComponent(email)}`;
+  }
+
   const payload = {
     recipients: [
       {
         to: [{ email }],
-        variables: {
-          otp: otp,
-          email: email,
-        },
+        variables: variables,
       },
     ],
     from: {
@@ -121,7 +136,7 @@ async function sendForgotPasswordEmailViaMsg91(email, otp) {
       name: process.env.MSG91_EMAIL_FROM_NAME || "Woglo",
     },
     domain: process.env.MSG91_EMAIL_DOMAIN,
-    template_id: process.env.MSG91_EMAIL_TEMPLATE_ID, // reset_password_65
+    template_id: templateId,
   };
 
   try {

@@ -212,7 +212,7 @@ exports.refreshToken = async (req, res) => { res.json({ message: 'Refresh token 
 // @access  Public
 exports.forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const { email, appType } = req.body;
 
     if (!email) {
       res.status(400);
@@ -235,8 +235,8 @@ exports.forgotPassword = async (req, res, next) => {
       { upsert: true, returnDocument: 'after' }
     );
 
-    // Send OTP via Email
-    await sendForgotPasswordEmailViaMsg91(email, otp);
+    // Send OTP via Email (Passing appType to decide which template to use)
+    await sendForgotPasswordEmailViaMsg91(email, otp, appType);
 
     res.status(200).json({
       success: true,
