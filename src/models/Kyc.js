@@ -7,7 +7,8 @@ const kycSchema = new mongoose.Schema({
     enum: ['Driving License', 'Aadhar Card', 'PAN Card', 'Passport'], 
     required: true 
   },
-  fileUrl: { type: String, required: true },
+  fileUrlFront: { type: String, required: true },
+  fileUrlBack: { type: String }, // Optional, not all docs have back side
   status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   uploadedAt: { type: Date, default: Date.now }
 }, { timestamps: true });

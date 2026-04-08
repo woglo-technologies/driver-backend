@@ -15,6 +15,7 @@ router.route('/account/profile')
   .put(driverController.updateAccountProfile);
 router.delete('/account', driverController.deleteAccount);
 router.get('/my-vehicles', driverController.getMyVehicles);
+router.get('/documents', driverController.getDocuments);
 
 router.get('/requests', driverController.getRequests);
 router.get('/requests/pending', driverController.getPendingRequests);

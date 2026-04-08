@@ -455,9 +455,9 @@ exports.uploadDriverKyc = async (req, res, next) => {
   try {
     const { type } = req.body;
 
-    if (!req.file) {
+    if (!req.files || !req.files['documentFileFront']) {
       res.status(400);
-      throw new Error('Please upload a file');
+      throw new Error('Please upload at least the front side of the document');
     }
 
     if (!type) {
@@ -472,12 +472,30 @@ exports.uploadDriverKyc = async (req, res, next) => {
       throw new Error(`Invalid KYC type. Must be one of: ${validTypes.join(', ')}`);
     }
 
-    const kyc = await Kyc.create({
-      driver: req.driver._id,
-      type,
-      fileUrl: `/uploads/kyc/${req.file.filename}`,
-      status: 'pending',
-    });
+    const fileUrlFront = `/uploads/kyc/${req.files['documentFileFront'][0].filename}`;
+    let fileUrlBack = undefined;
+
+    if (req.files['documentFileBack']) {
+      fileUrlBack = `/uploads/kyc/${req.files['documentFileBack'][0].filename}`;
+    }
+
+    // Check if this document type already exists for the driver, if so update it, else create new
+    let kyc = await Kyc.findOne({ driver: req.driver._id, type });
+    
+    if (kyc) {
+      kyc.fileUrlFront = fileUrlFront;
+      if (fileUrlBack) kyc.fileUrlBack = fileUrlBack;
+      kyc.status = 'pending'; // Reset status on re-upload
+      await kyc.save();
+    } else {
+      kyc = await Kyc.create({
+        driver: req.driver._id,
+        type,
+        fileUrlFront,
+        fileUrlBack,
+        status: 'pending',
+      });
+    }
 
     res.status(201).json({
       success: true,

@@ -145,6 +145,30 @@ exports.getDashboard = async (req, res, next) => {
 };
 exports.getAccountProfile = async (req, res) => { res.json({ message: 'Get driver account profile endpoint' }); };
 
+// @desc    Get all driver documents (KYC)
+// @route   GET /api/v1/driver/documents
+// @access  Private
+exports.getDocuments = async (req, res, next) => {
+  try {
+    const Kyc = require('../models/Kyc'); // Require here to avoid circular deps if any, or put it at the top
+    const documents = await Kyc.find({ driver: req.driver._id }).sort({ createdAt: -1 });
+    
+    // Map to frontend DriverDocument model format
+    const mappedDocs = documents.map(d => ({
+      name: d.type,
+      type: d.type,
+      urlFront: d.fileUrlFront,
+      urlBack: d.fileUrlBack || '',
+      status: d.status,
+      uploadedAt: d.createdAt ? d.createdAt.toISOString() : new Date().toISOString()
+    }));
+
+    res.json(mappedDocs);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Get all vendor requests for the driver
 // @route   GET /api/v1/driver/vendor-requests
 // @access  Private
@@ -481,23 +505,24 @@ exports.getCalendarAvailability = async (req, res, next) => {
   }
 };
 
-// @desc    Update driver calendar status (mark as 'leave' or 'available')
+// @desc    Update driver calendar status (mark as 'leave' or 'available' or 'booked')
 // @route   POST /api/v1/driver/calendar/update-status
 // @access  Private
 exports.updateCalendarStatus = async (req, res, next) => {
   try {
     const { date, status, reason } = req.body;
     
-    if (!['available', 'leave'].includes(status)) {
+    if (!['available', 'leave', 'booked'].includes(status)) {
       res.status(400);
-      throw new Error('Invalid status. Must be available or leave.');
+      throw new Error('Invalid status. Must be available, leave, or booked.');
     }
 
-    const eventDate = new Date(date);
-    eventDate.setHours(0, 0, 0, 0);
+    // Parse the incoming 'YYYY-MM-DD' as exact UTC midnight to prevent time zone shifts
+    const [year, month, day] = date.split('T')[0].split('-');
+    const eventDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
 
     const nextDay = new Date(eventDate);
-    nextDay.setDate(nextDay.getDate() + 1);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
 
     // Find if an event already exists for this day (to override it)
     let event = await Event.findOne({
@@ -506,12 +531,6 @@ exports.updateCalendarStatus = async (req, res, next) => {
     });
 
     if (event) {
-      // Don't modify 'booked' dates via manual driver overrides
-      if (event.type === 'booked') {
-        res.status(400);
-        throw new Error('Cannot update status for a booked day. Resolve the trip first.');
-      }
-      
       event.type = status;
       event.description = reason || '';
       await event.save();

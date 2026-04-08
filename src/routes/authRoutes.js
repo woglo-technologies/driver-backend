@@ -17,7 +17,7 @@ router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 router.post('/verify-email', authController.verifyEmail);
 router.post('/complete-driver-registration', protect, authController.completeDriverRegistration);
-router.post('/upload-driver-kyc', protect, uploadKyc.single('documentFile'), authController.uploadDriverKyc);
+router.post('/upload-driver-kyc', protect, uploadKyc.fields([{ name: 'documentFileFront', maxCount: 1 }, { name: 'documentFileBack', maxCount: 1 }]), authController.uploadDriverKyc);
 router.put('/change-password', protect, authController.changePassword);
 
 module.exports = router;
