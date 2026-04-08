@@ -134,6 +134,7 @@ exports.verifyEmailOtp = async (req, res, next) => {
       name: driver.name,
       email: driver.email,
       phone: driver.phone,
+      profilePicture: driver.profilePicture,
       token: generateToken(driver._id),
     });
   } catch (error) {
@@ -380,6 +381,7 @@ exports.verifyOtp = async (req, res, next) => {
       driverId: driver.driverId,
       name: driver.name,
       phone: driver.phone,
+      profilePicture: driver.profilePicture,
       isVerified: driver.isVerified,
       token: generateToken(driver._id),
     });
@@ -485,7 +487,7 @@ exports.uploadDriverKyc = async (req, res, next) => {
     if (kyc) {
       kyc.fileUrlFront = fileUrlFront;
       if (fileUrlBack) kyc.fileUrlBack = fileUrlBack;
-      kyc.status = 'pending'; // Reset status on re-upload
+      kyc.status = 'approved'; // Set to approved on update
       await kyc.save();
     } else {
       kyc = await Kyc.create({
@@ -493,10 +495,9 @@ exports.uploadDriverKyc = async (req, res, next) => {
         type,
         fileUrlFront,
         fileUrlBack,
-        status: 'pending',
+        status: 'approved',
       });
     }
-
     res.status(201).json({
       success: true,
       message: 'KYC Document uploaded successfully',
@@ -542,6 +543,37 @@ exports.changePassword = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Password updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Delete driver KYC document
+ * @route   DELETE /api/v1/auth/delete-driver-kyc/:id
+ * @access  Private
+ */
+exports.deleteDriverKyc = async (req, res, next) => {
+  try {
+    const kyc = await Kyc.findById(req.params.id);
+
+    if (!kyc) {
+      res.status(404);
+      throw new Error('Document not found');
+    }
+
+    // Check ownership
+    if (kyc.driver.toString() !== req.driver._id.toString()) {
+      res.status(401);
+      throw new Error('Not authorized to delete this document');
+    }
+
+    await Kyc.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Document deleted successfully'
     });
   } catch (error) {
     next(error);
