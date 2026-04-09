@@ -155,6 +155,7 @@ exports.getDocuments = async (req, res, next) => {
     
     // Map to frontend DriverDocument model format
     const mappedDocs = documents.map(d => ({
+      id: d._id,
       name: d.type,
       type: d.type,
       urlFront: d.fileUrlFront,
