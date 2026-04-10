@@ -4,7 +4,8 @@ const Otp = require('../models/Otp');
 const generateToken = require('../utils/generateToken');
 const { sendOtpViaMsg91, sendSignupEmailViaMsg91, sendForgotPasswordEmailViaMsg91 } = require('../utils/otpService');
 const { OAuth2Client } = require('google-auth-library');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const audiences = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.split(',').map(id => id.trim()) : [];
+const client = new OAuth2Client(audiences[0]);
 
 // @desc    Login or Signup with Google
 // @route   POST /api/v1/auth/google
@@ -18,10 +19,30 @@ exports.googleLoginOrSignup = async (req, res, next) => {
       throw new Error('Please provide a Google ID token');
     }
 
-    const ticket = await client.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    let ticket;
+    try {
+      ticket = await client.verifyIdToken({
+        idToken,
+        audience: audiences,
+      });
+    } catch (error) {
+      // Decode the token without verification to see what's wrong (audience mismatch)
+      const parts = idToken.split('.');
+      if (parts.length === 3) {
+        try {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          console.error('[Google Auth] Verification Failed. Payload:', {
+            aud: payload.aud,
+            azp: payload.azp,
+            email: payload.email,
+            audiencesChecked: audiences
+          });
+        } catch (decodeError) {
+          console.error('[Google Auth] Could not decode token:', decodeError.message);
+        }
+      }
+      throw error;
+    }
 
     const payload = ticket.getPayload();
     const { email, name, picture, sub: googleId } = payload;
