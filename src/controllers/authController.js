@@ -4,7 +4,7 @@ const Otp = require('../models/Otp');
 const generateToken = require('../utils/generateToken');
 const { sendOtpViaMsg91, sendSignupEmailViaMsg91, sendForgotPasswordEmailViaMsg91 } = require('../utils/otpService');
 const { OAuth2Client } = require('google-auth-library');
-const audiences = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.split(',').map(id => id.trim()) : [];
+const audiences = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.split(',').map(id => id.trim()).filter(id => id.length > 0) : [];
 const client = new OAuth2Client(audiences[0]);
 
 // @desc    Login or Signup with Google
