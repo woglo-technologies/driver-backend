@@ -6,14 +6,20 @@ const vendorRequestSchema = new mongoose.Schema({
   agencyName: { type: String },
   workLocation: { type: String },
   description: { type: String },
+  contactNumber: { type: String },
+  email: { type: String },
   driver: { type: mongoose.Schema.Types.ObjectId, ref: 'Driver', required: true },
   vehicleDetails: {
-    make: { type: String, required: true },
-    model: { type: String, required: true },
+    make: { type: String },
+    model: { type: String },
     year: { type: Number },
-    licensePlate: { type: String, required: true },
-    color: { type: String }
+    licensePlate: { type: String },
+    color: { type: String },
+    vehicleType: { type: String },
+    seatingCapacity: { type: Number }
   },
+  assignedFromDate: { type: Date },
+  assignedToDate: { type: Date },
   status: { 
     type: String, 
     enum: ['pending', 'accepted', 'declined'],

@@ -32,11 +32,13 @@ app.get('/', (req, res) => {
 const authRoutes = require('./routes/authRoutes');
 const driverRoutes = require('./routes/driverRoutes');
 const tripRoutes = require('./routes/tripRoutes');
+const vendorBridgeRoutes = require('./routes/vendorBridgeRoutes');
 
 // Mount Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/driver', driverRoutes);
 app.use('/api/v1/trips', tripRoutes);
+app.use('/api/v1/vendor', vendorBridgeRoutes);
 
 const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
 

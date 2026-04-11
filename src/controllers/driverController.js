@@ -186,11 +186,13 @@ exports.getVendorRequests = async (req, res, next) => {
       description: r.description,
       requestDate: r.createdAt.toISOString(),
       status: r.status,
-      contactNumber: r.vehicleDetails?.contactNumber, // If available
-      email: r.vehicleDetails?.email, // If available
-      vehicleType: r.vehicleDetails?.make,
-      vehicleModel: r.vehicleDetails?.model,
-      vehicleNumber: r.vehicleDetails?.licensePlate
+      contactNumber: r.contactNumber || r.vehicleDetails?.contactNumber || null,
+      email: r.email || r.vehicleDetails?.email || null,
+      vehicleType: r.vehicleDetails?.vehicleType || r.vehicleDetails?.make || null,
+      vehicleModel: r.vehicleDetails?.model || null,
+      vehicleNumber: r.vehicleDetails?.licensePlate || null,
+      assignedFromDate: r.assignedFromDate ? r.assignedFromDate.toISOString() : null,
+      assignedToDate: r.assignedToDate ? r.assignedToDate.toISOString() : null,
     }));
 
     res.json(mappedRequests);
@@ -293,17 +295,23 @@ exports.getMyVehicles = async (req, res, next) => {
     const mappedVehicles = vehicles.map(v => ({
       id: v._id,
       vehicleNumber: v.licensePlate,
-      vehicleType: v.make, // Assuming make/model or type needs mapping
+      vehicleType: v.vehicleType || v.make,
       vehicleModel: v.model,
       vehicleBrand: v.make,
       color: v.color || '',
       yearOfManufacture: v.year || 0,
+      seatingCapacity: v.seatingCapacity || 0,
       status: v.isApproved ? 'ACTIVE' : 'PENDING_APPROVAL',
       vendorName: v.vendorName,
+      vendorId: v.vendorId,
+      contactNumber: v.vendorContactNumber,
+      email: v.vendorEmail,
       agencyName: v.agencyName,
       workLocation: v.workLocation,
       description: v.description,
-      partnershipDate: v.partnershipDate ? v.partnershipDate.toISOString() : v.createdAt.toISOString()
+      partnershipDate: v.partnershipDate ? v.partnershipDate.toISOString() : v.createdAt.toISOString(),
+      assignedFromDate: v.assignedFromDate ? v.assignedFromDate.toISOString() : null,
+      assignedToDate: v.assignedToDate ? v.assignedToDate.toISOString() : null,
     }));
 
     res.json(mappedVehicles);
