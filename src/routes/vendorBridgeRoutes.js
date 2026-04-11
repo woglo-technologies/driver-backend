@@ -40,4 +40,7 @@ router.get('/driver-calendar/:driverId', vendorBridgeController.getDriverCalenda
 // POST /api/v1/vendor/assign-vehicle
 router.post('/assign-vehicle', vendorBridgeController.assignVehicle);
 
+// GET /api/v1/vendor/drivers/partnered/:vendorId
+router.get('/drivers/partnered/:vendorId', vendorBridgeController.getPartneredDrivers);
+
 module.exports = router;

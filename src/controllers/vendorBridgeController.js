@@ -331,3 +331,47 @@ exports.assignVehicle = async (req, res, next) => {
     next(error);
   }
 };
+// ──────────────────────────────────────────────────────────────────
+// GET /api/v1/vendor/partnered-drivers/:vendorId
+// Returns all drivers currently associated with a specific vendor
+// (Drivers who have an active vehicle assignment from that vendor)
+// ──────────────────────────────────────────────────────────────────
+exports.getPartneredDrivers = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+
+    if (!vendorId) {
+      return res.status(400).json({ success: false, error: 'vendorId is required' });
+    }
+
+    // Find all vehicles associated with this vendor
+    const vehicles = await Vehicle.find({ vendorId }).populate('driver').lean();
+
+    // Map to driver objects
+    const mapped = vehicles
+      .filter(v => v.driver) // Ensure driver exists
+      .map(v => {
+        const d = v.driver;
+        return {
+          id: d._id,
+          driverId: d.driverId,
+          fullName: d.name || '',
+          phone: d.phone || '',
+          age: d.dob
+            ? Math.floor((Date.now() - new Date(d.dob)) / (365.25 * 24 * 60 * 60 * 1000))
+            : 0,
+          photoUrl: d.profilePicture || null,
+          rating: d.rating || 0,
+          isVerified: d.isVerified || false,
+          invitationStatus: 'accepted',
+          assignedVehicleNumber: v.licensePlate,
+          assignedFromDate: v.assignedFromDate,
+          assignedToDate: v.assignedToDate,
+        };
+      });
+
+    res.json({ success: true, data: mapped });
+  } catch (error) {
+    next(error);
+  }
+};
