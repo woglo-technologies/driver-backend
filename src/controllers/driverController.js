@@ -230,21 +230,27 @@ exports.respondToVendorRequest = async (req, res, next) => {
 
     // The crucial logic: if accepted, securely extract vehicle and map to driver.
     if (status === 'accepted') {
-      const vDetails = request.vehicleDetails;
-      await Vehicle.create({
-        driver: req.driver._id,
-        make: vDetails.make,
-        model: vDetails.model,
-        year: vDetails.year,
-        licensePlate: vDetails.licensePlate,
-        color: vDetails.color,
-        isApproved: true, // Implicit trust since vendor provided it
-        vendorName: request.vendorName,
-        agencyName: request.agencyName,
-        workLocation: request.workLocation,
-        description: request.description,
-        partnershipDate: new Date()
-      });
+      const vDetails = request.vehicleDetails || {};
+      
+      // Only create a vehicle record if mandatory identification fields are present.
+      // Discovery requests often don't have these details yet.
+      if (vDetails.make && vDetails.model && vDetails.licensePlate) {
+        await Vehicle.create({
+          driver: req.driver._id,
+          make: vDetails.make,
+          model: vDetails.model,
+          year: vDetails.year,
+          licensePlate: vDetails.licensePlate,
+          color: vDetails.color,
+          isApproved: true, // Implicit trust since vendor provided it
+          vendorId: request.vendorId,
+          vendorName: request.vendorName,
+          agencyName: request.agencyName,
+          workLocation: request.workLocation,
+          description: request.description,
+          partnershipDate: new Date()
+        });
+      }
     }
 
     res.json({
