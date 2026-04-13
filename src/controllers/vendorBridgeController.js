@@ -231,12 +231,12 @@ exports.assignVehicle = async (req, res, next) => {
       // Update existing
       vehicle.vendorId = vendorId;
       vehicle.vendorName = vendorName;
-      vehicle.vendorContactNumber = contactNumber;
-      vehicle.vendorEmail = email;
-      vehicle.agencyName = agencyName;
-      vehicle.workLocation = workLocation;
-      vehicle.vehicleType = vehicleDetails.vehicleType;
-      vehicle.seatingCapacity = vehicleDetails.seatingCapacity;
+      vehicle.vendorContactNumber = contactNumber || vehicle.vendorContactNumber;
+      vehicle.vendorEmail = email || vehicle.vendorEmail;
+      vehicle.agencyName = agencyName || vehicle.agencyName;
+      vehicle.workLocation = workLocation || vehicle.workLocation;
+      vehicle.vehicleType = vehicleDetails.vehicleType || vehicle.vehicleType;
+      vehicle.seatingCapacity = vehicleDetails.seatingCapacity || vehicle.seatingCapacity;
       vehicle.make = vehicleDetails.make || vehicle.make;
       vehicle.model = vehicleDetails.model || vehicle.model;
       vehicle.color = vehicleDetails.color || vehicle.color;
@@ -304,6 +304,32 @@ exports.assignVehicle = async (req, res, next) => {
 
         cursor.setDate(cursor.getDate() + 1);
       }
+    } else if (fromDateObj) {
+      // Just mark today if toDate is missing
+      const cursor = new Date(fromDateObj);
+      cursor.setHours(0, 0, 0, 0);
+      const nextDay = new Date(cursor);
+      nextDay.setDate(nextDay.getDate() + 1);
+
+      const existing = await Event.findOne({
+        driver: driverId,
+        date: { $gte: cursor, $lt: nextDay },
+      });
+
+      const eventData = {
+        type: 'booked',
+        description: `Assigned to ${vendorName} - ${vehicleDetails.licensePlate}`,
+      };
+
+      if (!existing) {
+        await Event.create({
+          driver: driverId,
+          date: new Date(cursor),
+          ...eventData,
+        });
+      } else if (existing.type !== 'leave') {
+        await Event.updateOne({ _id: existing._id }, eventData);
+      }
     }
 
     // Notify driver of vehicle assignment
@@ -331,10 +357,11 @@ exports.assignVehicle = async (req, res, next) => {
     next(error);
   }
 };
+
 // ──────────────────────────────────────────────────────────────────
-// GET /api/v1/vendor/partnered-drivers/:vendorId
+// GET /api/v1/vendor/drivers/partnered/:vendorId
 // Returns all drivers currently associated with a specific vendor
-// (Drivers who have an active vehicle assignment from that vendor)
+// (Drivers who have an active vehicle assignment from that vendor OR pending/accepted requests)
 // ──────────────────────────────────────────────────────────────────
 exports.getPartneredDrivers = async (req, res, next) => {
   try {
@@ -347,13 +374,18 @@ exports.getPartneredDrivers = async (req, res, next) => {
     // 1. Find all vehicles associated with this vendor
     const vehicles = await Vehicle.find({ vendorId }).populate('driver').lean();
 
-    // 2. Find all accepted requests (handles drivers who accepted but aren't assigned a vehicle yet)
-    const acceptedRequests = await VendorRequest.find({ vendorId, status: 'accepted' }).populate('driver').lean();
+    // 2. Find all non-rejected requests (pending or accepted)
+    const requests = await VendorRequest.find({
+      vendorId,
+      status: { $in: ['pending', 'accepted'] },
+    })
+      .populate('driver')
+      .lean();
 
     const driverMap = new Map();
 
-    // Process accepted requests first (baseline)
-    acceptedRequests.forEach(r => {
+    // Process requests first (set base status)
+    requests.forEach(r => {
       if (r.driver) {
         const d = r.driver;
         driverMap.set(d._id.toString(), {
@@ -367,7 +399,7 @@ exports.getPartneredDrivers = async (req, res, next) => {
           photoUrl: d.profilePicture || null,
           rating: d.rating || 0,
           isVerified: d.isVerified || false,
-          invitationStatus: 'accepted',
+          invitationStatus: r.status, // 'pending' or 'accepted'
           assignedVehicleNumber: null,
           assignedFromDate: r.assignedFromDate || null,
           assignedToDate: r.assignedToDate || null,
