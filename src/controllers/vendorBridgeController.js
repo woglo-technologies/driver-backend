@@ -389,7 +389,7 @@ exports.getPartneredDrivers = async (req, res, next) => {
       if (r.driver) {
         const d = r.driver;
         driverMap.set(d._id.toString(), {
-          id: d._id,
+          id: d._id.toString(),
           driverId: d.driverId,
           fullName: d.name || '',
           phone: d.phone || '',
@@ -412,7 +412,7 @@ exports.getPartneredDrivers = async (req, res, next) => {
       if (v.driver) {
         const d = v.driver;
         driverMap.set(d._id.toString(), {
-          id: d._id,
+          id: d._id.toString(),
           driverId: d.driverId,
           fullName: d.name || '',
           phone: d.phone || '',
