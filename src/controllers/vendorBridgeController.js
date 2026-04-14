@@ -21,7 +21,7 @@ const Notification = require('../models/Notification');
 // ──────────────────────────────────────────────────────────────────
 exports.getAvailableDrivers = async (req, res, next) => {
   try {
-    const { search } = req.query;
+    const { search, vendorId } = req.query;
     let query = {};
 
     if (search && search.trim()) {
@@ -37,29 +37,61 @@ exports.getAvailableDrivers = async (req, res, next) => {
 
     const drivers = await Driver.find(query).select('-password').lean();
 
-    const mapped = drivers.map(d => ({
-      id: d._id,
-      driverId: d.driverId,
-      fullName: d.name || '',
-      phone: d.phone || '',
-      age: d.dob
-        ? Math.floor((Date.now() - new Date(d.dob)) / (365.25 * 24 * 60 * 60 * 1000))
-        : 0,
-      address: d.address
-        ? [d.address.line1, d.address.city, d.address.state].filter(Boolean).join(', ')
-        : '',
-      licenseNumber: d.license?.number || '',
-      licenseTypes: d.license?.types || [],
-      aadhaarNumber: d.documents?.aadharNumber || '',
-      panNumber: d.documents?.panCardNumber || '',
-      photoUrl: d.profilePicture || null,
-      rating: d.rating || 0,
-      isVerified: d.isVerified || false,
-      experience: null,
-      totalTrips: null,
-    }));
+    // If vendorId is provided, get their relationship status with these drivers
+    let vendorRequests = [];
+    let vendorVehicles = [];
+    if (vendorId) {
+      const driverIds = drivers.map(d => d._id);
+      vendorRequests = await VendorRequest.find({
+        vendorId,
+        driver: { $in: driverIds },
+      }).lean();
+      vendorVehicles = await Vehicle.find({
+        vendorId,
+        driver: { $in: driverIds },
+      }).lean();
+    }
 
-    res.json({ success: true, data: mapped });
+    const mapped = drivers.map(d => {
+      let invitationStatus = null;
+      
+      // Check if driver has a vehicle assigned by this vendor (Accepted)
+      const hasVehicle = vendorVehicles.find(v => v.driver.toString() === d._id.toString());
+      if (hasVehicle) {
+        invitationStatus = 'accepted';
+      } else {
+        // Check if there is a request
+        const request = vendorRequests.find(r => r.driver.toString() === d._id.toString());
+        if (request) {
+          invitationStatus = request.status; // 'pending' or 'accepted'
+        }
+      }
+
+      return {
+        id: d._id.toString(),
+        driverId: d.driverId,
+        fullName: d.name || '',
+        phone: d.phone || '',
+        age: d.dob
+          ? Math.floor((Date.now() - new Date(d.dob)) / (365.25 * 24 * 60 * 60 * 1000))
+          : 0,
+        address: d.address
+          ? [d.address.line1, d.address.city, d.address.state].filter(Boolean).join(', ')
+          : '',
+        licenseNumber: d.license?.number || '',
+        licenseTypes: d.license?.types || [],
+        aadhaarNumber: d.documents?.aadharNumber || '',
+        panNumber: d.documents?.panCardNumber || '',
+        photoUrl: d.profilePicture || null,
+        rating: d.rating || 0,
+        isVerified: d.isVerified || false,
+        invitationStatus, // Real partnership status
+        experience: null,
+        totalTrips: null,
+      };
+    });
+
+    res.json({ success: true, count: mapped.length, data: mapped });
   } catch (error) {
     next(error);
   }
@@ -388,6 +420,8 @@ exports.getPartneredDrivers = async (req, res, next) => {
     requests.forEach(r => {
       if (r.driver) {
         const d = r.driver;
+        const status = (r.status || 'pending').toLowerCase();
+        
         driverMap.set(d._id.toString(), {
           id: d._id.toString(),
           driverId: d.driverId,
@@ -399,7 +433,7 @@ exports.getPartneredDrivers = async (req, res, next) => {
           photoUrl: d.profilePicture || null,
           rating: d.rating || 0,
           isVerified: d.isVerified || false,
-          invitationStatus: r.status, // 'pending' or 'accepted'
+          invitationStatus: status, // 'pending' or 'accepted'
           assignedVehicleNumber: null,
           assignedFromDate: r.assignedFromDate || null,
           assignedToDate: r.assignedToDate || null,
