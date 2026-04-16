@@ -56,12 +56,12 @@ exports.getAvailableDrivers = async (req, res, next) => {
       let invitationStatus = null;
       
       // Check if driver has a vehicle assigned by this vendor (Accepted)
-      const hasVehicle = vendorVehicles.find(v => v.driver.toString() === d._id.toString());
+      const hasVehicle = vendorVehicles.find(v => v.driver && v.driver.toString() === d._id.toString());
       if (hasVehicle) {
         invitationStatus = 'accepted';
       } else {
         // Check if there is a request
-        const request = vendorRequests.find(r => r.driver.toString() === d._id.toString());
+        const request = vendorRequests.find(r => r.driver && r.driver.toString() === d._id.toString());
         if (request) {
           invitationStatus = request.status; // 'pending' or 'accepted'
         }
