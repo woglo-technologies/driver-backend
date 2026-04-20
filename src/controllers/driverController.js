@@ -264,6 +264,33 @@ exports.respondToVendorRequest = async (req, res, next) => {
   }
 };
 
+// @desc    Delete a vendor request (driver dismisses it)
+// @route   DELETE /api/v1/driver/vendor-requests/:id
+// @access  Private
+exports.deleteVendorRequest = async (req, res, next) => {
+  try {
+    const request = await VendorRequest.findOne({ _id: req.params.id, driver: req.driver._id });
+
+    if (!request) {
+      res.status(404);
+      throw new Error('Vendor request not found');
+    }
+
+    // Only allow deleting pending or declined requests.
+    // Accepted requests represent live partnerships — protect them from accidental deletion.
+    if (request.status === 'accepted') {
+      res.status(400);
+      throw new Error('Cannot delete an accepted vendor request. Contact the vendor to end the partnership.');
+    }
+
+    await VendorRequest.deleteOne({ _id: request._id });
+
+    res.json({ success: true, message: 'Vendor request deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    MOCK: Generate a vendor request (For internal testing)
 // @route   POST /api/v1/driver/vendor-requests/mock-send
 // @access  Private
@@ -321,6 +348,35 @@ exports.getMyVehicles = async (req, res, next) => {
     }));
 
     res.json(mappedVehicles);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete a vehicle
+// @route   DELETE /api/v1/driver/my-vehicles/:id
+// @access  Private
+exports.deleteVehicle = async (req, res, next) => {
+  try {
+    const vehicle = await Vehicle.findOne({ _id: req.params.id, driver: req.driver._id });
+
+    if (!vehicle) {
+      res.status(404);
+      throw new Error('Vehicle not found');
+    }
+
+    // Clean up calendar events that were booked for this specific vehicle assignment
+    if (vehicle.licensePlate) {
+      await Event.deleteMany({
+        driver: req.driver._id,
+        type: 'booked',
+        description: new RegExp(vehicle.licensePlate, 'i'),
+      });
+    }
+
+    await Vehicle.deleteOne({ _id: vehicle._id });
+
+    res.json({ success: true, message: 'Vehicle removed successfully' });
   } catch (error) {
     next(error);
   }

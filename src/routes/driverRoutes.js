@@ -15,6 +15,7 @@ router.route('/account/profile')
   .put(driverController.updateAccountProfile);
 router.delete('/account', driverController.deleteAccount);
 router.get('/my-vehicles', driverController.getMyVehicles);
+router.delete('/my-vehicles/:id', driverController.deleteVehicle);
 router.get('/documents', driverController.getDocuments);
 
 router.get('/requests', driverController.getRequests);
@@ -23,6 +24,7 @@ router.put('/requests/:id/status', driverController.updateRideStatus);
 
 router.get('/vendor-requests', driverController.getVendorRequests);
 router.put('/vendor-requests/:id/respond', driverController.respondToVendorRequest);
+router.delete('/vendor-requests/:id', driverController.deleteVendorRequest);
 router.post('/vendor-requests/mock-send', driverController.mockCreateVendorRequest);
 
 router.get('/inbox', driverController.getInbox);
