@@ -47,6 +47,17 @@ exports.updateAccountProfile = async (req, res, next) => {
         driver.password = req.body.password;
       }
 
+      if (req.body.email !== undefined) {
+        if (req.body.email !== "" && req.body.email !== driver.email) {
+          const emailExists = await Driver.findOne({ email: req.body.email, _id: { $ne: driver._id } });
+          if (emailExists) {
+            res.status(400);
+            throw new Error('This email address is already in use by another account');
+          }
+        }
+        driver.email = req.body.email;
+      }
+
       // Update all new profile fields
       if (req.body.dob) driver.dob = req.body.dob;
       if (req.body.address) {
@@ -276,12 +287,7 @@ exports.deleteVendorRequest = async (req, res, next) => {
       throw new Error('Vendor request not found');
     }
 
-    // Only allow deleting pending or declined requests.
-    // Accepted requests represent live partnerships — protect them from accidental deletion.
-    if (request.status === 'accepted') {
-      res.status(400);
-      throw new Error('Cannot delete an accepted vendor request. Contact the vendor to end the partnership.');
-    }
+    // We now allow deleting accepted requests so drivers can remove them from their list.
 
     await VendorRequest.deleteOne({ _id: request._id });
 
@@ -764,8 +770,9 @@ exports.uploadProfilePicture = async (req, res, next) => {
       throw new Error('Driver not found');
     }
 
-    // Save relative path (e.g., uploads/profiles/filename.png)
-    driver.profilePicture = `/${req.file.path.replace(/\\/g, '/')}`;
+    // Convert the image buffer to a Base64 string
+    const base64Str = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    driver.profilePicture = base64Str;
     await driver.save();
 
     res.status(200).json({

@@ -495,11 +495,14 @@ exports.uploadDriverKyc = async (req, res, next) => {
       throw new Error(`Invalid KYC type. Must be one of: ${validTypes.join(', ')}`);
     }
 
-    const fileUrlFront = `/uploads/kyc/${req.files['documentFileFront'][0].filename}`;
-    let fileUrlBack = undefined;
+    // Extract file buffers from memory storage and convert to Base64 data URIs
+    const frontFile = req.files['documentFileFront'][0];
+    const fileUrlFront = `data:${frontFile.mimetype};base64,${frontFile.buffer.toString('base64')}`;
 
+    let fileUrlBack = undefined;
     if (req.files['documentFileBack']) {
-      fileUrlBack = `/uploads/kyc/${req.files['documentFileBack'][0].filename}`;
+      const backFile = req.files['documentFileBack'][0];
+      fileUrlBack = `data:${backFile.mimetype};base64,${backFile.buffer.toString('base64')}`;
     }
 
     // Check if this document type already exists for the driver, if so update it, else create new
@@ -508,7 +511,7 @@ exports.uploadDriverKyc = async (req, res, next) => {
     if (kyc) {
       kyc.fileUrlFront = fileUrlFront;
       if (fileUrlBack) kyc.fileUrlBack = fileUrlBack;
-      kyc.status = 'approved'; // Set to approved on update
+      kyc.status = 'pending'; // Requires admin approval
       await kyc.save();
     } else {
       kyc = await Kyc.create({
@@ -516,7 +519,7 @@ exports.uploadDriverKyc = async (req, res, next) => {
         type,
         fileUrlFront,
         fileUrlBack,
-        status: 'approved',
+        status: 'pending',
       });
     }
     res.status(201).json({

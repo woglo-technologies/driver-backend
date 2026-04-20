@@ -47,13 +47,13 @@ const profileStorage = multer.diskStorage({
 });
 
 const uploadKyc = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: fileFilter,
 });
 
 const uploadProfile = multer({
-  storage: profileStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit for profiles
   fileFilter: fileFilter,
 });
