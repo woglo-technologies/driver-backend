@@ -169,8 +169,8 @@ exports.getDocuments = async (req, res, next) => {
       id: d._id,
       name: d.type,
       type: d.type,
-      urlFront: d.fileUrlFront.startsWith('/') ? d.fileUrlFront : `/${d.fileUrlFront}`,
-      urlBack: d.fileUrlBack ? (d.fileUrlBack.startsWith('/') ? d.fileUrlBack : `/${d.fileUrlBack}`) : '',
+      urlFront: d.fileUrlFront.startsWith('data:') ? d.fileUrlFront : (d.fileUrlFront.startsWith('/') ? d.fileUrlFront : `/${d.fileUrlFront}`),
+      urlBack: d.fileUrlBack ? (d.fileUrlBack.startsWith('data:') ? d.fileUrlBack : (d.fileUrlBack.startsWith('/') ? d.fileUrlBack : `/${d.fileUrlBack}`)) : '',
       status: d.status,
       uploadedAt: d.createdAt ? d.createdAt.toISOString() : new Date().toISOString()
     }));
