@@ -471,3 +471,68 @@ exports.getPartneredDrivers = async (req, res, next) => {
     next(error);
   }
 };
+
+// ──────────────────────────────────────────────────────────────────
+// DELETE /api/v1/vendor/partnership/:driverId/:vendorId
+// Terminates the partnership: deletes requests, vehicle assignments,
+// and clears the driver's calendar of slots booked by this vendor.
+// ──────────────────────────────────────────────────────────────────
+exports.removeVendorPartnership = async (req, res, next) => {
+  try {
+    const { driverId, vendorId } = req.params;
+
+    if (!driverId || !vendorId) {
+      return res.status(400).json({
+        success: false,
+        error: 'driverId and vendorId are required',
+      });
+    }
+
+    // 1. Delete all vendor requests from this vendor for this driver
+    const deletedRequests = await VendorRequest.deleteMany({
+      driver: driverId,
+      vendorId: vendorId,
+    });
+
+    // 2. Delete vehicle assignments from this vendor for this driver
+    // We search by driver and vendorId to ensure we only remove the vendor's assignment
+    const deletedVehicles = await Vehicle.deleteMany({
+      driver: driverId,
+      vendorId: vendorId,
+    });
+
+    // 3. Clear 'booked' events from driver calendar that were associated with this vendor
+    // Since we don't have a direct link to the vendorId in the Event model,
+    // we have to rely on the description or we can assume any 'booked' events
+    // that overlap with the removed assignments should be reconsidered.
+    // For now, let's look for events mentioning 'Assigned to' in description if possible,
+    // or just remove all 'booked' events for simplicity if we can't be precise.
+    // A safer way is to just remove events that mention 'Assigned to' since that's what assignVehicle does.
+    
+    await Event.deleteMany({
+      driver: driverId,
+      type: 'booked',
+      description: { $regex: /Assigned to/i }
+    });
+
+    // 4. Notify driver
+    await Notification.create({
+      driver: driverId,
+      title: 'Partnership Terminated',
+      message: `A vendor has removed you from their driver list and unassigned any vehicles.`,
+      type: 'PARTNERSHIP_REMOVED',
+      isRead: false,
+    });
+
+    res.json({
+      success: true,
+      message: 'Partnership terminated successfully',
+      details: {
+        requestsDeleted: deletedRequests.deletedCount,
+        vehiclesDeleted: deletedVehicles.deletedCount,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

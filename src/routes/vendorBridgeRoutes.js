@@ -40,6 +40,9 @@ router.get('/driver-calendar/:driverId', vendorBridgeController.getDriverCalenda
 // POST /api/v1/vendor/assign-vehicle
 router.post('/assign-vehicle', vendorBridgeController.assignVehicle);
 
+// DELETE /api/v1/vendor/partnership/:driverId/:vendorId
+router.delete('/partnership/:driverId/:vendorId', vendorBridgeController.removeVendorPartnership);
+
 // GET /api/v1/vendor/drivers/partnered/:vendorId
 router.get('/drivers/partnered/:vendorId', vendorBridgeController.getPartneredDrivers);
 
