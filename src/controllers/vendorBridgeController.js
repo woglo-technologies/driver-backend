@@ -536,3 +536,72 @@ exports.removeVendorPartnership = async (req, res, next) => {
     next(error);
   }
 };
+
+// ──────────────────────────────────────────────────────────────────
+// POST /api/v1/vendor/accept-request
+// Body: { driverId, vendorId }
+// Mocks a driver's acceptance of a vendor's request.
+// ──────────────────────────────────────────────────────────────────
+exports.acceptVendorRequest = async (req, res, next) => {
+  try {
+    const { driverId, vendorId } = req.body;
+
+    if (!driverId || !vendorId) {
+      return res.status(400).json({ success: false, error: 'driverId and vendorId are required' });
+    }
+
+    const request = await VendorRequest.findOne({ 
+      driver: driverId, 
+      vendorId: vendorId, 
+      status: 'pending' 
+    });
+
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'No pending request found for this driver and vendor' });
+    }
+
+    request.status = 'accepted';
+    await request.save();
+
+    // Create vehicle record if details are available
+    const vDetails = request.vehicleDetails || {};
+    if (vDetails.make && vDetails.model && vDetails.licensePlate) {
+      // Check if vehicle already exists for this driver/plate
+      let vehicle = await Vehicle.findOne({ 
+        driver: driverId, 
+        licensePlate: vDetails.licensePlate 
+      });
+
+      if (!vehicle) {
+        await Vehicle.create({
+          driver: driverId,
+          make: vDetails.make,
+          model: vDetails.model,
+          year: vDetails.year,
+          licensePlate: vDetails.licensePlate,
+          color: vDetails.color,
+          isApproved: true,
+          vendorId: vendorId,
+          vendorName: request.vendorName,
+          agencyName: request.agencyName,
+          workLocation: request.workLocation,
+          description: request.description,
+          partnershipDate: new Date()
+        });
+      }
+    }
+
+    // Notify driver
+    await Notification.create({
+      driver: driverId,
+      title: 'Partnership Accepted (Simulation)',
+      message: `Your partnership with ${request.vendorName} has been simulated as accepted.`,
+      type: 'VENDOR_REQUEST',
+      isRead: false,
+    });
+
+    res.json({ success: true, message: 'Request accepted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};

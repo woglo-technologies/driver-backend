@@ -46,4 +46,7 @@ router.delete('/partnership/:driverId/:vendorId', vendorBridgeController.removeV
 // GET /api/v1/vendor/drivers/partnered/:vendorId
 router.get('/drivers/partnered/:vendorId', vendorBridgeController.getPartneredDrivers);
 
+// POST /api/v1/vendor/accept-request
+router.post('/accept-request', vendorBridgeController.acceptVendorRequest);
+
 module.exports = router;
