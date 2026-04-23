@@ -287,11 +287,36 @@ exports.deleteVendorRequest = async (req, res, next) => {
       throw new Error('Vendor request not found');
     }
 
-    // We now allow deleting accepted requests so drivers can remove them from their list.
+    const vendorId = request.vendorId;
+    const driverId = req.driver._id;
 
+    // 1. Delete the vendor request
     await VendorRequest.deleteOne({ _id: request._id });
 
-    res.json({ success: true, message: 'Vendor request deleted successfully' });
+    // 2. Cascade: also delete any vehicle assigned by this vendor to this driver
+    const deletedVehicles = await Vehicle.find({ driver: driverId, vendorId: vendorId });
+    for (const v of deletedVehicles) {
+      // Clear calendar events booked for this vehicle
+      if (v.licensePlate) {
+        await Event.deleteMany({
+          driver: driverId,
+          type: 'booked',
+          description: new RegExp(v.licensePlate, 'i'),
+        });
+      }
+    }
+    await Vehicle.deleteMany({ driver: driverId, vendorId: vendorId });
+
+    // 3. Notify driver
+    await Notification.create({
+      driver: driverId,
+      title: 'Vendor Removed',
+      message: `You have removed the vendor partnership. All associated vehicle assignments have been cleared.`,
+      type: 'PARTNERSHIP_REMOVED',
+      isRead: false,
+    });
+
+    res.json({ success: true, message: 'Vendor request and associated vehicles deleted successfully' });
   } catch (error) {
     next(error);
   }
@@ -371,18 +396,28 @@ exports.deleteVehicle = async (req, res, next) => {
       throw new Error('Vehicle not found');
     }
 
-    // Clean up calendar events that were booked for this specific vehicle assignment
+    const driverId = req.driver._id;
+    const vendorId = vehicle.vendorId;
+
+    // 1. Clean up calendar events booked for this vehicle
     if (vehicle.licensePlate) {
       await Event.deleteMany({
-        driver: req.driver._id,
+        driver: driverId,
         type: 'booked',
         description: new RegExp(vehicle.licensePlate, 'i'),
       });
     }
 
+    // 2. Delete the vehicle
     await Vehicle.deleteOne({ _id: vehicle._id });
 
-    res.json({ success: true, message: 'Vehicle removed successfully' });
+    // 3. Cascade: also delete the VendorRequest from this vendor so it disappears
+    // from the driver's Vendor Requests list as well
+    if (vendorId) {
+      await VendorRequest.deleteMany({ driver: driverId, vendorId: vendorId });
+    }
+
+    res.json({ success: true, message: 'Vehicle removed and vendor request cleared successfully' });
   } catch (error) {
     next(error);
   }
@@ -792,14 +827,27 @@ exports.deleteAccount = async (req, res, next) => {
   try {
     const driverId = req.driver._id;
 
-    // Delete associated data first
-    await Vehicle.deleteMany({ owner: driverId });
+    // 1. Delete all vendor partnerships (requests + vehicles + calendar events)
+    const vehicles = await Vehicle.find({ driver: driverId });
+    for (const v of vehicles) {
+      if (v.licensePlate) {
+        await Event.deleteMany({
+          driver: driverId,
+          type: 'booked',
+          description: new RegExp(v.licensePlate, 'i'),
+        });
+      }
+    }
+    await Vehicle.deleteMany({ driver: driverId }); // Fix: was { owner: driverId }
+    await VendorRequest.deleteMany({ driver: driverId }); // Was missing entirely
+
+    // 2. Delete other driver data
     await Ride.deleteMany({ driver: driverId });
-    await Event.deleteMany({ driver: driverId });
-    await Notification.deleteMany({ recipient: driverId });
-    await Message.deleteMany({ $or: [{ senderId: driverId }, { receiverId: driverId }] });
-    
-    // Finally delete the driver
+    await Event.deleteMany({ driver: driverId }); // cleans any remaining events
+    await Notification.deleteMany({ driver: driverId }); // Fix: was { recipient: driverId }
+    await Message.deleteMany({ $or: [{ sender: driverId }, { receiver: driverId }] }); // Fix: was senderId/receiverId
+
+    // 3. Finally delete the driver
     const driver = await Driver.findByIdAndDelete(driverId);
 
     if (!driver) {

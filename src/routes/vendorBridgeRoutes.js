@@ -49,4 +49,8 @@ router.get('/drivers/partnered/:vendorId', vendorBridgeController.getPartneredDr
 // POST /api/v1/vendor/accept-request
 router.post('/accept-request', vendorBridgeController.acceptVendorRequest);
 
+// DELETE /api/v1/vendor/vendor-account/:vendorId
+// Called by Vendor Backend when a vendor deletes their account
+router.delete('/vendor-account/:vendorId', vendorBridgeController.deleteVendorAccount);
+
 module.exports = router;

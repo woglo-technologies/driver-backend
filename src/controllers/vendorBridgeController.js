@@ -605,3 +605,63 @@ exports.acceptVendorRequest = async (req, res, next) => {
     next(error);
   }
 };
+
+// ──────────────────────────────────────────────────────────────────
+// DELETE /api/v1/vendor/vendor-account/:vendorId
+// Called by Vendor Backend when a vendor deletes their account.
+// Removes ALL VendorRequests + Vehicles + calendar events for this vendor
+// across ALL drivers, so drivers' Vendor Requests and My Vehicles clear automatically.
+// ──────────────────────────────────────────────────────────────────
+exports.deleteVendorAccount = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+
+    if (!vendorId) {
+      return res.status(400).json({ success: false, error: 'vendorId is required' });
+    }
+
+    // 1. Find all vehicles assigned by this vendor (across all drivers)
+    const vehicles = await Vehicle.find({ vendorId }).lean();
+
+    // 2. Clear calendar events for each vehicle's license plate
+    for (const v of vehicles) {
+      if (v.licensePlate && v.driver) {
+        await Event.deleteMany({
+          driver: v.driver,
+          type: 'booked',
+          description: new RegExp(v.licensePlate, 'i'),
+        });
+      }
+    }
+
+    // 3. Delete all vehicles assigned by this vendor
+    const deletedVehicles = await Vehicle.deleteMany({ vendorId });
+
+    // 4. Delete all vendor requests from this vendor
+    const deletedRequests = await VendorRequest.deleteMany({ vendorId });
+
+    // 5. Notify all affected drivers
+    const affectedDriverIds = [...new Set(vehicles.map(v => v.driver?.toString()).filter(Boolean))];
+    for (const driverId of affectedDriverIds) {
+      await Notification.create({
+        driver: driverId,
+        title: 'Vendor Account Deleted',
+        message: 'A vendor you were partnered with has deleted their account. All associated requests and vehicle assignments have been removed.',
+        type: 'PARTNERSHIP_REMOVED',
+        isRead: false,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Vendor account data removed from all drivers',
+      details: {
+        vehiclesDeleted: deletedVehicles.deletedCount,
+        requestsDeleted: deletedRequests.deletedCount,
+        driversNotified: affectedDriverIds.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
