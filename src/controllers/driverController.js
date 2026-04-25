@@ -6,6 +6,9 @@ const Event = require('../models/Event');
 const Notification = require('../models/Notification');
 const Message = require('../models/Message');
 const Support = require('../models/Support');
+const Kyc = require('../models/Kyc');
+const Otp = require('../models/Otp');
+const Trip = require('../models/Trip');
 
 // @desc    Get driver profile
 // @route   GET /api/v1/driver/profile
@@ -244,7 +247,6 @@ exports.respondToVendorRequest = async (req, res, next) => {
       const vDetails = request.vehicleDetails || {};
       
       // Only create a vehicle record if mandatory identification fields are present.
-      // Discovery requests often don't have these details yet.
       if (vDetails.make && vDetails.model && vDetails.licensePlate) {
         await Vehicle.create({
           driver: req.driver._id,
@@ -253,9 +255,11 @@ exports.respondToVendorRequest = async (req, res, next) => {
           year: vDetails.year,
           licensePlate: vDetails.licensePlate,
           color: vDetails.color,
-          isApproved: true, // Implicit trust since vendor provided it
+          isApproved: true,
           vendorId: request.vendorId,
           vendorName: request.vendorName,
+          vendorContactNumber: request.contactNumber || null, // Fix: save contact
+          vendorEmail: request.email || null,                 // Fix: save email
           agencyName: request.agencyName,
           workLocation: request.workLocation,
           description: request.description,
@@ -838,19 +842,32 @@ exports.deleteAccount = async (req, res, next) => {
         });
       }
     }
-    await Vehicle.deleteMany({ driver: driverId }); // Fix: was { owner: driverId }
-    await VendorRequest.deleteMany({ driver: driverId }); // Was missing entirely
+    await Vehicle.deleteMany({ driver: driverId });
+    await VendorRequest.deleteMany({ driver: driverId });
 
-    // 2. Delete other driver data
+    // 2. Delete KYC documents — frees up document re-upload for re-registration
+    const kycResult = await Kyc.deleteMany({ driver: driverId });
+    console.log(`[deleteAccount] Deleted ${kycResult.deletedCount} KYC document(s) for driver ${driverId}`);
+
+    // 3. Delete OTP records — frees phone/email for re-registration
+    const driver = await Driver.findById(driverId).select('phone email');
+    if (driver) {
+      if (driver.phone) await Otp.deleteMany({ phone: driver.phone });
+      if (driver.email) await Otp.deleteMany({ email: driver.email });
+    }
+
+    // 4. Delete other driver data
     await Ride.deleteMany({ driver: driverId });
-    await Event.deleteMany({ driver: driverId }); // cleans any remaining events
-    await Notification.deleteMany({ driver: driverId }); // Fix: was { recipient: driverId }
-    await Message.deleteMany({ $or: [{ sender: driverId }, { receiver: driverId }] }); // Fix: was senderId/receiverId
+    await Trip.deleteMany({ driver: driverId }).catch(() => {}); // graceful if Trip model differs
+    await Event.deleteMany({ driver: driverId });
+    await Notification.deleteMany({ driver: driverId });
+    await Message.deleteMany({ $or: [{ sender: driverId }, { receiver: driverId }] });
+    await Support.deleteMany({ driver: driverId }).catch(() => {});
 
-    // 3. Finally delete the driver
-    const driver = await Driver.findByIdAndDelete(driverId);
+    // 5. Finally delete the driver record itself
+    const deletedDriver = await Driver.findByIdAndDelete(driverId);
 
-    if (!driver) {
+    if (!deletedDriver) {
       res.status(404);
       throw new Error('Driver not found');
     }
@@ -863,3 +880,4 @@ exports.deleteAccount = async (req, res, next) => {
     next(error);
   }
 };
+
